@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { englishBooks } from './data/booksData';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
+// PDF.JS WORKER - NETLIFY ÜÇÜN XÜSUSİ KONFİQ
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 export default function BookReaderPage() {
@@ -17,46 +18,23 @@ export default function BookReaderPage() {
   const [pageNumber, setPageNumber] = useState(1);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
   const [showPopup, setShowPopup] = useState(false);
-  const [pdfWords, setPdfWords] = useState({});
-  const [extracting, setExtracting] = useState(false);
+  const [pdfError, setPdfError] = useState('');
 
   const book = englishBooks.find(b => b.id === parseInt(bookId));
 
-  // BACKEND-DƏN SÖZLƏRİ ÇIXART
-  const extractWordsFromPDF = async (pageNum) => {
-    if (pdfWords[pageNum]) return; // Artıq çıxarılıb
-    
-    setExtracting(true);
-    try {
-      const response = await fetch('/.netlify/functions/extract-pdf-words', {
-        method: 'POST',
-        body: JSON.stringify({ 
-          pdfUrl: `${window.location.origin}${book.pdfUrl}`,
-          pageNumber: pageNum
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setPdfWords(prev => ({
-          ...prev,
-          [pageNum]: data.words
-        }));
-        console.log(`📝 Page ${pageNum} words:`, data.words);
-      }
-    } catch (error) {
-      console.error('Extraction error:', error);
-    } finally {
-      setExtracting(false);
-    }
+  // PDF URL-Nİ TAM AL
+  const getPdfUrl = () => {
+    if (!book) return '';
+    return `${window.location.origin}${book.pdfUrl}`;
   };
 
-  // SÖZ SEÇMƏ - DEQİQ KOORDİNATLAR İLƏ
+  // SÖZ SEÇMƏ
   const handleTextSelection = useCallback(() => {
     const selection = window.getSelection();
     const text = selection.toString().trim();
     
+    console.log('🎯 SELECTED TEXT:', text);
+
     if (text && text.split(' ').length === 1) {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
@@ -70,13 +48,6 @@ export default function BookReaderPage() {
       fetchDefinition(text);
     }
   }, []);
-
-  // SƏHİFƏ DƏYİŞƏNDƏ SÖZLƏRİ ÇIXART
-  useEffect(() => {
-    if (pageNumber) {
-      extractWordsFromPDF(pageNumber);
-    }
-  }, [pageNumber]);
 
   // DICTIONARY API
   const fetchDefinition = async (word) => {
@@ -99,16 +70,26 @@ export default function BookReaderPage() {
     setLoading(false);
   };
 
+  // PDF UĞURLA YÜKLƏNDİ
+  function onDocumentLoadSuccess({ numPages }) {
+    setNumPages(numPages);
+    setPdfError('');
+    console.log('✅ PDF LOADED! Pages:', numPages);
+  }
+
+  // PDF ERROR
+  function onDocumentLoadError(error) {
+    console.error('❌ PDF ERROR:', error);
+    setPdfError('PDF failed to load. Please try refreshing the page.');
+  }
+
+  // POP-UP BAĞLA
   const closePopup = () => {
     setShowPopup(false);
     setSelectedWord('');
     setDefinition('');
     window.getSelection().removeAllRanges();
   };
-
-  function onDocumentLoadSuccess({ numPages }) {
-    setNumPages(numPages);
-  }
 
   if (!book) {
     return <div>Book not found</div>;
@@ -136,9 +117,13 @@ export default function BookReaderPage() {
         <div>
           <h1 style={{ color: '#FF6B35', margin: 0 }}>{book.title}</h1>
           <p style={{ color: '#888', margin: '5px 0 0 0', fontSize: '14px' }}>
-            Level: {book.level} • 📖 <strong>SELECT WORDS IN PDF!</strong>
-            {extracting && ' • 🔄 Extracting words...'}
+            Level: {book.level} • 📖 <strong>SELECT ANY WORD IN PDF!</strong>
           </p>
+          {pdfError && (
+            <p style={{ color: 'red', margin: '5px 0 0 0', fontSize: '12px' }}>
+              {pdfError}
+            </p>
+          )}
         </div>
 
         <button
@@ -203,7 +188,7 @@ export default function BookReaderPage() {
         </div>
 
         <div style={{ color: '#FF6B35', fontSize: '14px', fontWeight: '600' }}>
-          🎯 BACKEND POWERED WORD SELECTION!
+          🎯 CLICK AND SELECT WORDS!
         </div>
       </div>
 
@@ -217,14 +202,14 @@ export default function BookReaderPage() {
           minHeight: '800px',
           display: 'flex',
           justifyContent: 'center',
-          overflow: 'auto',
-          position: 'relative'
+          overflow: 'auto'
         }}
         onMouseUp={handleTextSelection}
       >
         <Document
-          file={book.pdfUrl}
+          file={getPdfUrl()}  // TAM URL İSTİFADƏ ET
           onLoadSuccess={onDocumentLoadSuccess}
+          onLoadError={onDocumentLoadError}
           loading={
             <div style={{ 
               color: '#FF6B35', 
@@ -233,6 +218,34 @@ export default function BookReaderPage() {
               padding: '50px'
             }}>
               Loading PDF...
+              <p style={{ fontSize: '14px', color: '#888', marginTop: '10px' }}>
+                {getPdfUrl()}
+              </p>
+            </div>
+          }
+          error={
+            <div style={{ 
+              color: 'red', 
+              fontSize: '18px', 
+              textAlign: 'center',
+              padding: '50px'
+            }}>
+              <h3>PDF Loading Failed</h3>
+              <p>URL: {getPdfUrl()}</p>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  background: '#FF6B35',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  marginTop: '15px'
+                }}
+              >
+                Try Again
+              </button>
             </div>
           }
         >
@@ -250,31 +263,6 @@ export default function BookReaderPage() {
             }
           />
         </Document>
-
-        {extracting && (
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'rgba(0,0,0,0.8)',
-            color: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '30px',
-              height: '30px',
-              border: '3px solid #FF6B35',
-              borderTop: '3px solid transparent',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 10px'
-            }}></div>
-            Extracting words from page {pageNumber}...
-          </div>
-        )}
       </div>
 
       {/* Pop-up Definition */}
