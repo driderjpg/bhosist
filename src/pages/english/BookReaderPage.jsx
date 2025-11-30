@@ -25,7 +25,7 @@ export default function BookReaderPage() {
   // PDF URL-Nİ TAM AL
   const getPdfUrl = () => {
     if (!book) return '';
-    return `${window.location.origin}${book.pdfUrl}`;
+    return book.pdfUrl;
   };
 
   // SÖZ SEÇMƏ
