@@ -1,0 +1,67 @@
+/* CSS RESET - Scroll var, çərçivə yox */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #000000;
+  border: none;
+  overflow: auto;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background: #000000;
+  display: block;
+  border: none;
+  outline: none;
+}
+
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background: #000000;
+  border: none;
+  outline: none;
+}
+
+/* Narın scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #FF6B35;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF8B35;
+}
+
+/* Bütün elementlərin xarici sərhədlərini yox et */
+* {
+  border: none !important;
+  outline: none !important;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
